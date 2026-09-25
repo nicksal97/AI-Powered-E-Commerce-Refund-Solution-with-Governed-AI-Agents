@@ -1,0 +1,27 @@
+# Local dev tweaks: bind-mount source for live reload + so generated files
+# (alembic migrations, etc.) land on the host. Compose loads this automatically.
+services:
+  backend:
+    volumes:
+      - ./backend:/app
+      - ./seed:/app/seed:ro
+      - ./docs:/app/docs:ro
+      - vault_creds:/vault-creds:ro
+    command: ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]
+
+  worker:
+    volumes:
+      - ./worker:/app
+      - ./ml:/app/ml
+      - ./docs:/app/docs
+      - vault_creds:/vault-creds:ro
+      - hf_cache:/root/.cache/huggingface   # CLIP/detector weights persist across recreate
+    # no host port for :9100 — Prometheus scrapes it over the internal network
+    # (worker:9100, see infra/prometheus/prometheus.yml), and a fixed host port
+    # blocks `docker compose up -d --scale worker=N` outright (every replica
+    # would fight over the same host port). Use `docker compose exec worker
+    # curl localhost:9100/metrics` for direct access, or Grafana/Prometheus.
+
+  mcp-server:
+    volumes:
+      - ./mcp-server:/app
